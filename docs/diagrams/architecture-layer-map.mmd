@@ -1,0 +1,45 @@
+flowchart TB
+    subgraph API["① API layer (HTTP)"]
+        direction TB
+        CC["ChatController<br/>POST /v1/chat"]
+        MC["MetricsController<br/>GET /metrics · GET /healthz"]
+    end
+
+    subgraph SYNC["② Synchronous immediate-return path (request thread)"]
+        direction TB
+        PS["ProxyService.handleChat()"]
+        PL["Primary LlmClient"]
+        DO_P["DigitalOcean Serverless Inference<br/>Primary model"]
+        PS --> PL --> DO_P
+        DO_P --> PL --> PS
+    end
+
+    subgraph SHADOW["③ Decoupled background shadow pool (shadow-* threads)"]
+        direction TB
+        Q["ThreadPoolTaskExecutor<br/>core=4 · max=16 · queue=500"]
+        SES["ShadowExecutionService"]
+        CL["Candidate LlmClient"]
+        DO_C["DigitalOcean Serverless Inference<br/>Candidate model"]
+        CMP["ComparisonService<br/>JSON validity + action match"]
+        MS["MetricsStore"]
+
+        Q --> SES
+        SES --> CL --> DO_C
+        DO_C --> CL --> SES
+        SES --> CMP --> MS
+    end
+
+    Client(["Customer"]) --> CC
+    CC --> PS
+    PS -->|"return ChatCompletionResponse<br/>(does not wait for shadow)"| CC
+    CC -->|"HTTP 200 immediately"| Client
+
+    PS -.->|"dispatchShadow()<br/>fire-and-forget"| Q
+
+    MC --> MS
+    PS -.->|"recordRequestProcessed()"| MS
+    SES -.->|"errors / timeouts / comparisons"| MS
+
+    style API fill:#e8f4fd,stroke:#1a73e8
+    style SYNC fill:#e6f4ea,stroke:#137333
+    style SHADOW fill:#fef7e0,stroke:#b06000

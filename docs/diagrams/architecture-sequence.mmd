@@ -1,0 +1,47 @@
+sequenceDiagram
+    autonumber
+    participant Client
+    box rgb(232,244,253) API layer
+        participant Chat as ChatController
+        participant Metrics as MetricsController
+    end
+    box rgb(230,244,234) Sync immediate-return path
+        participant Proxy as ProxyService
+        participant Primary as Primary LlmClient
+        participant DO1 as DO Inference (primary)
+    end
+    box rgb(254,247,224) Background shadow pool
+        participant Pool as shadowExecutor
+        participant Shadow as ShadowExecutionService
+        participant Candidate as Candidate LlmClient
+        participant DO2 as DO Inference (candidate)
+        participant Compare as ComparisonService
+        participant Store as MetricsStore
+    end
+
+    Client->>Chat: POST /v1/chat
+    Chat->>Store: recordRequestProcessed()
+    Chat->>Proxy: handleChat()
+    Proxy->>Primary: chatCompletions() [blocking]
+    Primary->>DO1: POST /v1/chat/completions
+    DO1-->>Primary: response
+    Primary-->>Proxy: LlmCallResult
+    Proxy-->>Chat: ChatCompletionResponse
+    Chat-->>Client: HTTP 200 (immediate)
+
+    Note over Proxy,Pool: Primary already returned — shadow starts here
+
+    Proxy->>Pool: dispatchShadow() [non-blocking submit]
+    Pool->>Shadow: runShadowCandidate()
+    Shadow->>Candidate: chatCompletions()
+    Candidate->>DO2: POST /v1/chat/completions
+    DO2-->>Candidate: response
+    Candidate-->>Shadow: LlmCallResult
+    Shadow->>Compare: compareResponses() — JSON + action
+    Compare-->>Shadow: ComparisonBreakdown
+    Shadow->>Store: recordComparison()
+
+    Client->>Metrics: GET /metrics
+    Metrics->>Store: observabilitySummary()
+    Store-->>Metrics: totals, errors, match rate %
+    Metrics-->>Client: JSON summary

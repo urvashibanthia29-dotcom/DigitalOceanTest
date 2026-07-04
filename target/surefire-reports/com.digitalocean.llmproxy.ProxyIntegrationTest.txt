@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.digitalocean.llmproxy.ProxyIntegrationTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.186 s -- in com.digitalocean.llmproxy.ProxyIntegrationTest
