@@ -2,6 +2,11 @@
 
 Static exports of the diagrams in [README.md](../README.md).
 
+## Design document
+
+- **[LLM-Proxy-Design-Document.docx](LLM-Proxy-Design-Document.docx)** — Word development design document (problem statement, goals, architecture, trade-offs, etc.)
+- Regenerate: `python3 generate_design_doc.py`
+
 | Diagram | PNG | SVG | Source |
 |---------|-----|-----|--------|
 | Layer map (API · sync path · shadow pool) | [architecture-layer-map.png](architecture-layer-map.png) | [architecture-layer-map.svg](architecture-layer-map.svg) | [architecture-layer-map.mmd](architecture-layer-map.mmd) |
