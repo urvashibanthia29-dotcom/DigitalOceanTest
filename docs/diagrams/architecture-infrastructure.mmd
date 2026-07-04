@@ -1,0 +1,49 @@
+flowchart TB
+    Client(["Client"]) --> LB["Load Balancer<br/>GET /healthz"]
+
+    subgraph Instance["Proxy Instance — Spring Boot :8080"]
+        direction TB
+
+        subgraph API["Controllers"]
+            CC["ChatController<br/>POST /v1/chat"]
+            MC["MetricsController<br/>GET /metrics · /healthz"]
+        end
+
+        subgraph Sync["Sync path — HTTP thread"]
+            PS["ProxyService"]
+            PL["Primary LlmClient"]
+        end
+
+        subgraph Shadow["Shadow path — background threads"]
+            BSE["BoundedShadowExecutor"]
+            SES["ShadowExecutionService"]
+            CL["Candidate LlmClient"]
+            CMP["ComparisonService"]
+        end
+
+        MS["MetricsStore"]
+
+        CC --> PS
+        PS --> PL
+        PS -.-> BSE
+        BSE --> SES --> CL
+        SES --> CMP --> MS
+        PS -.-> MS
+        CC -.-> MS
+        MC --> MS
+    end
+
+    LB --> CC
+    PL -->|"sync"| Primary["DO Inference — Primary"]
+    Primary --> PL
+    PL --> CC
+    CC --> LB
+    LB --> Client
+
+    CL -->|"async"| Candidate["DO Inference — Candidate"]
+
+    Prom["Prometheus"] -.-> MC
+
+    style API fill:#e8f4fd,stroke:#1a73e8
+    style Sync fill:#e6f4ea,stroke:#137333
+    style Shadow fill:#fef7e0,stroke:#b06000
